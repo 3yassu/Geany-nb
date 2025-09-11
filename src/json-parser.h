@@ -37,15 +37,41 @@ typedef struct Source{
 	char **src;
 }Source;
 
-typedef struct Code{ //Code
+typedef struct Code{ 
 	int execution_count;
 	Source src;
 	Metadata info;
 }Code;
 
-typedef struct Mkdn{ //Markdown
+typedef struct Mkdn{ 
 	Source src;
 	Metadata info;
 }Mkdn;
+
+typedef union Block{
+	Code code;
+	Mkdn mkdn;
+}Block;
+
+typedef enum{
+	CODE;
+	MKDN;
+}BlockType;
+
+typedef struct Cell{
+	BlockType type;
+	Block cell;
+}
+
+typedef struct Notebook{
+	int nbformat_major, nbformat_minor;
+	Metadata metadata;
+	Cell *notebook;
+	//size_t len;
+
+}Notebook;
+
+Notebook *notebook_create(char *file);
+void cell_create(BlockType type, Notebook *notebook);
 
 #endif
