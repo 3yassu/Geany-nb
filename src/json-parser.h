@@ -23,7 +23,7 @@
  */
 #ifndef NOTEBOOK_JSON_PARSER_H
 #define NOTEBOOK_JSON_PARSER_H
-#include <string.h>
+
 typedef struct{
 	char *key;
 	char *value;
@@ -33,18 +33,14 @@ typedef struct Metadata{
 	Dict *dict;
 }Metadata;
 
-typedef struct Source{
-	char **src;
-}Source;
-
 typedef struct Code{ 
 	int execution_count;
-	Source src;
+	//Source src; <- Interface with Scintilla
 	Metadata info;
 }Code;
 
 typedef struct Mkdn{ 
-	Source src;
+	//Source src; <- Interface with scintilla
 	Metadata info;
 }Mkdn;
 
@@ -64,11 +60,10 @@ typedef struct Cell{
 }
 
 typedef struct Notebook{
-	int nbformat_major, nbformat_minor;
+	int nbformat_major, nbformat_minor; //Will allow support for most major versions
 	Metadata metadata;
 	Cell *notebook;
-	//size_t len;
-
+	unsigned int len;
 }Notebook;
 
 Notebook *notebook_create(char *file);
