@@ -23,6 +23,8 @@
  */
 #ifndef NOTEBOOK_JSON_PARSER_H
 #define NOTEBOOK_JSON_PARSER_H
+#include "Scintilla.h"
+#include "ScintillaWidget.h"
 
 typedef struct{
 	char *key;

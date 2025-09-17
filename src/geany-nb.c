@@ -34,6 +34,7 @@ static gboolean notebook_init(GeanyPlugin *plugin, gpointer pdata){
     /*g_signal_connect(main_menu_item, "activate", G_CALLBACK(notebook_setting), NULL);
      *Widget will make menu to instantiate code/markup block or to change the order?
      *	Also a setting to allow to edit format
+		 *	add make cell, markdown setting.
      */
  
     geany_plugin_set_data(plugin, main_menu_item, NULL);
