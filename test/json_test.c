@@ -7,6 +7,6 @@ int main(int argc, char *argv[]){
 	json_integer_set(json_object_get(root, "nbformat"), argc);
 	save_json("test.json", root);
 	json_decref(root);
-	printf("Hello, Geany %s", argv[0]);
+	printf("Hello, Geany %s", argv[0]); //test
 	return 0;
 }
