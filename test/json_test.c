@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <jansson.h>
 #include <stdlib.h>
 #include "json_utils.h"
 
@@ -8,5 +7,6 @@ int main(int argc, char *argv[]){
 	json_integer_set(json_object_get(root, "nbformat"), argc);
 	save_json("test.json", root);
 	json_decref(root);
+	printf("Hello, Geany %s", argv[0]);
 	return 0;
 }
