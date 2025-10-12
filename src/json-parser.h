@@ -23,52 +23,47 @@
  */
 #ifndef NOTEBOOK_JSON_PARSER_H
 #define NOTEBOOK_JSON_PARSER_H
-#include "Scintilla.h"
-#include "ScintillaWidget.h"
+//#include "Scintilla.h"
+//#include "ScintillaWidget.h"
+#include <yyjson.h>
+#include <stdbool.h>
 
-typedef struct{
-	char *key;
-	char *value;
-}Dict;
-
-typedef struct Metadata{
-	Dict *dict;
-}Metadata;
-
-typedef struct Code{ 
-	int execution_count;
-	//Source src; <- Interface with Scintilla
-	Metadata info;
+typedef struct Code{
+	yyjson_mut_val *src;
 }Code;
 
-typedef struct Mkdn{ 
-	//Source src; <- Interface with scintilla
-	Metadata info;
+typedef struct Mkdn{
+	yyjson_mut_val *src;
 }Mkdn;
+
+typedef enum BlockType{
+	CELL;
+	MKDN;
+}BlockType;
 
 typedef union Block{
 	Code code;
 	Mkdn mkdn;
 }Block;
 
-typedef enum{
-	CODE;
-	MKDN;
-}BlockType;
-
 typedef struct Cell{
+	const char *key;
+	Block entry;
 	BlockType type;
-	Block cell;
-}
+}Cell;
 
 typedef struct Notebook{
-	int nbformat_major, nbformat_minor; //Will allow support for most major versions
-	Metadata metadata;
-	Cell *notebook;
-	unsigned int len;
-}Notebook;
+  int nbformat_major, nbformat_minor; //might make yyjson_mut_val
+  yyjson_mut_doc *src;
+  yyjson_mut_val *root;
+  Cell *cells;
+  size_t length;
+  size_t capacity;
+} Notebook;
 
 Notebook *notebook_create(char *file);
 void cell_create(BlockType type, Notebook *notebook);
+void cells_drop(Cell *cell, size_t length);
+void notebook_drop(Notebook *notebook);
 
 #endif
