@@ -25,7 +25,8 @@
 //#include "utils.h"
 #include <uuid/uuid.h>
 
-#define FNV_OFFSET 14695981039346656037UL //might move to some hashtable.h or something
+//might move to some hashtable.h or something
+#define FNV_OFFSET 14695981039346656037UL 
 #define FNV_PRIME 1099511628211UL
 
 const char *cell_id_gen();
