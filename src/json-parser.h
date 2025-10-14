@@ -59,11 +59,13 @@ typedef struct Notebook{
   Cell *cells;
   size_t length;
   size_t capacity;
+	//char *list[8]; //Canonical list of Cells keys (used when "Run All is called")
 } Notebook;
 
 Notebook *notebook_create(char *file);
 void cell_create(BlockType type, Notebook *notebook);
 void cells_drop(Cell *cell, size_t length);
 void notebook_drop(Notebook *notebook);
+bool notebook_contains(Notebook *notebook, const char *key);
 
 #endif

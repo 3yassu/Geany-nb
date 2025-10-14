@@ -32,6 +32,7 @@
 const char *cell_id_gen();
 size_t notebook_hash(const char *id);
 void notebook_double(Notebook *notebook);
+void notebook_half(Notebook *notebook);
 void add_cell(Notebook *notebook, BlockType, type, const char *id);
 
 const char *cell_id_gen(){
@@ -51,29 +52,68 @@ size_t notebook_hash(const char *id){
 	return (size_t)(hash)
 }
 
-void notebook_double(Notebook *notebook){
-	Cell *new_notebook_cells = (Cell *)calloc(notebook_capacity*2, sizeof(cell));
-	for(size_t i == 0; i < notebook_capacity; i++)
-		if(notebook->cells[i])
-			new_notebook_cells[notebook_hash((notebook->cells)[i]->id)] = (notebook->cells)[i];
-	free(notebook->cells);
-	notebook->cells = new_notebook_cells;
-	notebook->capacity *= 2;
+bool notebook_contains(Notebook *notebook, const char *key){
+	return (bool)(notebook->cells[notebook_hash(key) % notebook->capacity])
 }
 
-void add_cell(Notebook *notebook, BlockType, type, const char *id){
-	if(type == CODE){
-		yyjson_mut_obj_add_str(notebook->src, new_cell, "cell_type", "code");
-		yyjson_mut_obj_add_uint(notebook->src, new_cell, "execution_count", 0);
+void notebook_double(Notebook *notebook){
+	size_t new_capacity = notebook->capacity*2;
+	Cell *new_notebook_cells = (Cell *)calloc(new_capacity, sizeof(Cell));
+	for(size_t i == 0; i < notebook->capacity; i++)
+		if(notebook->cells[i])
+			new_notebook_cells[notebook_hash((notebook->cells)[i]->id) % new_capacity] = (notebook->cells)[i];
+	free(notebook->cells);
+	notebook->cells = new_notebook_cells;
+	notebook->capacity = new_capacity;
+}
+
+void notebook_half(Notebook *notebook){
+	size_t new_capacity = notebook->capacity/2;
+	//if(new_capacity <= notebook->length) PANIC
+	Cell *new_notebook_cells = (Cell *)calloc(new_capacity, sizeof(Cell));
+	for(size_t i == 0; i < notebook->capacity; i++)
+		if(notebook->cells[i])
+			new_notebook_cells[notebook_hash(notebook->cells[i]->id) % new_capacity] = notebook->cells[i];
+	free(notebook->cells);
+	notebook->cells = new_notebook_cells;
+	notebook->capacity = new_capacity;
+}
+
+void add_cell(BlockType type, Notebook *notebook, Cell *cell){
+	const char *cell_id;
+	if(cell){
+		cell_id = cell->key;
+		size_t hash = notebook_hash(cell->key) % notebook->capacity;
+		if(notebook_contains(cell->key))
+			cell_id = cell_id_gen();
+		while(notebook_contains(cell_id)){
+			if(cell_id != cell->key)
+				free(cell_id);
+			cell_id = cell_id_gen();
+			hash = notebook_hash(cell_id) % notebook->capacity; 
+		}
+		if(cell->key == cell_id)
+			notebook[hash] = *cell;
+		else{
+			bool set = yyjson_mut_set_str(yyjson_mut_obj_get(cell->entry.src, "metadata"), cell_id);
+			//if(!bool) PANIC
+		}
+		return;
 	}
-	else if(type == MKDN)
-		yyjson_mut_obj_add_str(notebook->src, new_cell, "cell_type", "markdown");
-	//else DO SOME PANIC
-	yyjson_mut_val *source = yyjson_mut_obj_add_arr(notebook->src, new_cell, "source");
-	yyjson_mut_val *metadata = yyjson_mut_obj_add_obj(notebook->src, new_cell, "metadata");
-	yyjson_mut_obj_add_str(notebook->src, metadata, "id", id);
-	(notebook->cells)[hash] = (Cell){.key = cell_id, .entry = (Block){source}, .type = type};
-	(notebook->length)++;
+		
+	if(notebook->length >= (notebook->capacity)/(2))
+		notebook_double(notebook);
+	cell_id = cell_id_gen();
+	size_t hash = notebook_hash(cell_id) % notebook->capacity;
+	while(notebook_contains(cell_id)){
+		free(cell_id);
+		cell_id = cell_id_gen();
+		hash = notebook_hash(cell_id) % notebook->capacity; 
+	}
+
+	yyjson_mut_val *new_cell = yyjson_mut_arr_add_obj(notebook->src, yyjson_mut_obj_get(root, "cells"));
+
+	notebook_cell_create(notebook, type, cell_id);
 }
 
 
@@ -90,23 +130,23 @@ Notebook *notebook_create(char *file, int flag){//will need to change the file p
 	}
 }
 
-void cell_create(BlockType type, Notebook *notebook){
-	if(notebook->length >= (notebook->capacity)/(2))
-		notebook_double(notebook);
-	const char *cell_id = cell_id_gen();
-	size_t hash = notebook_hash(cell_id) % notebook->capacity;
-	while(notebook->cells[hash]){
-		free(cell_id);
-		cell_id = cell_id_gen();
-		hash = notebook_hash(cell_id) % notebook->capacity; 
+void cell_create(Notebook *notebook, BlockType, type, const char *id){
+	
+	if(type == CODE){
+		yyjson_mut_obj_add_str(notebook->src, new_cell, "cell_type", "code");
+		yyjson_mut_obj_add_uint(notebook->src, new_cell, "execution_count", 0);
 	}
-
-	yyjson_mut_val *new_cell = yyjson_mut_arr_add_obj(notebook->src, yyjson_mut_obj_get(root, "cells"));
-
-	notebook_add_cell(notebook, type, cell_id);
+	else if(type == MKDN)
+		yyjson_mut_obj_add_str(notebook->src, new_cell, "cell_type", "markdown");
+	//else DO SOME PANIC
+	yyjson_mut_val *source = yyjson_mut_obj_add_arr(notebook->src, new_cell, "source");
+	yyjson_mut_val *metadata = yyjson_mut_obj_add_obj(notebook->src, new_cell, "metadata");
+	yyjson_mut_obj_add_str(notebook->src, metadata, "id", id);
+	(notebook->cells)[hash] = (Cell){.key = cell_id, .entry = (Block){source}, .type = type};
+	(notebook->length)++;
 }
 
-void cells_drop(Cell *cell, size_t lenght){
+void cells_drop(Cell *cell, size_t length){
 	for(size_t i = 0, i < length, i++)
 		if(cell+i)
 			free(cell[i].key);
