@@ -27,26 +27,32 @@
 //#include "ScintillaWidget.h"
 #include <yyjson.h>
 #include <stdbool.h>
+#include <geanyplugin.h>//Switch to "Scintilla.h"/"ScintillaWidget.h" and maybe add "gtk/gtk"
 
-typedef struct Code{
-	yyjson_mut_val *src;
-}Code;
+//typedef struct Code{
+//	yyjson_mut_val *src;
+//}Code;
 
-typedef struct Mkdn{
-	yyjson_mut_val *src;
-}Mkdn;
+//typedef struct Mkdn{
+//	yyjson_mut_val *src;
+//}Mkdn;
 
 typedef enum BlockType{
-	CELL;
-	MKDN;
+	CODE,
+	MKDN,
 }BlockType;
 
-typedef union Block{
-	Code code;
-	Mkdn mkdn;
+//typedef union Block{
+//	Code code;
+//	Mkdn mkdn;
+//}Block;
+
+typedef struct Block{
+	yyjson_mut_val *src;
 }Block;
 
 typedef struct Cell{
+	bool valid;
 	const char *key;
 	Block entry;
 	BlockType type;
@@ -62,10 +68,11 @@ typedef struct Notebook{
 	//char *list[8]; //Canonical list of Cells keys (used when "Run All is called")
 } Notebook;
 
-Notebook *notebook_create(char *file);
-void cell_create(BlockType type, Notebook *notebook);
+Notebook *notebook_create(ScintillaObject *sci, int flag);
+void cell_create(Notebook *notebook, BlockType type, const char *key, yyjson_mut_val *new_cell);
 void cells_drop(Cell *cell, size_t length);
 void notebook_drop(Notebook *notebook);
 bool notebook_contains(Notebook *notebook, const char *key);
+bool notebook_load_cells(Notebook *notebook);
 
 #endif
