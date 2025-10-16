@@ -39,7 +39,7 @@ yyjson_mut_doc *notebook_create_doc(ScintillaObject *sci);
 const char *cell_id_gen(){
 	uuid_t uuid;
 	uuid_generate(uuid);
-	char *id = (char *)malloc(9);
+	char *id = (char *)malloc(13);
 	uuid_unparse(uuid, id);
 	return id;
 }
@@ -125,7 +125,7 @@ Notebook *notebook_create(ScintillaObject *sci, int flag){//flag = 0 means new f
 	*notebook = (Notebook){
 			.nbformat_major = 4, .nbformat_minor = 4,
 			.src = NULL, .root = NULL, .cells = NULL,
-			.length = 0, .capacity = 0};
+			.length = 0, .capacity = 0, .list = NULL};
 	if(flag)
 		notebook->src = notebook_create_doc(sci);
 	if(!notebook->src){
@@ -154,7 +154,7 @@ void cell_create(Notebook *notebook, BlockType type, const char *id, yyjson_mut_
 	yyjson_mut_val *metadata = yyjson_mut_obj_add_obj(notebook->src, new_cell, "metadata");
 	yyjson_mut_obj_add_str(notebook->src, metadata, "id", id);
 	size_t hash = notebook_hash(id) % notebook->capacity;
-	(notebook->cells)[hash] = (Cell){.valid = true, .key = id, .entry = (Block){source}, .type = type};
+	(notebook->cells)[hash] = (Cell){.valid = true, .key = id, .entry = (Block){new_cell}, .type = type};
 	(notebook->length)++;
 }
 
@@ -166,16 +166,19 @@ void notebook_load_cell(Notebook *notebook, yyjson_mut_val *cell){
 		type = CODE;
 	else
 		type = MKDN;
-	notebook->cells[hash] = (Cell){.valid = true, .key = id, .entry = (Block){yyjson_mut_obj_get(cell, "source")}, .type = type};
+	notebook->cells[hash] = (Cell){.valid = true, .key = id, .entry = (Block){cell}, .type = type};
+	notebook->list[notebook->length] = id;
+	(notebook->length)++;
 }
 
 bool notebook_load_cells(Notebook *notebook){
 	yyjson_mut_val *arr = yyjson_mut_obj_get(notebook->root, "cells");
 	if(!arr) return false;
 	size_t length = yyjson_mut_arr_size(arr);
-	notebook->cells = (Cell *)calloc(length * 2, sizeof(Cell));
+	notebook->cells = (Cell *)calloc(length * 4, sizeof(Cell));
+	notebook->list = (const char **)malloc(sizeof(const char *) * length * 4);
 	if(!notebook->cells) return false;
-	notebook->capacity = length * 2;
+	notebook->capacity = length * 4;
 	size_t idx, max;
 	yyjson_mut_val *elem;
 	yyjson_mut_arr_foreach(arr, idx, max, elem) {
@@ -184,15 +187,23 @@ bool notebook_load_cells(Notebook *notebook){
 	return true;
 }
 
-void cells_drop(Cell *cells, size_t length){
-	if(!cells) return;
-	for(size_t i = 0; i < length; i++)
-		if(cells[i].valid)
-			free((void *)(cells[i].key));
+void notebook_set_text(Notebook *notebook, ScintillaObject *sci){
+	sci_set_text(sci, "\n");
+	for(size_t i = 0; i < notebook->capacity; i++)
+		if(notebook->cells[i].valid){
+			size_t idx, max;
+			yyjson_mut_val *elem;
+			yyjson_mut_arr_foreach( yyjson_mut_obj_get(notebook->cells[i].entry.src, "source"), idx, max, elem){
+				const char *buffer = yyjson_mut_get_str(elem);
+				if(!buffer) continue;
+				sci_insert_text(sci, -1, buffer);
+			}
+		}
 }
+
 void notebook_drop(Notebook *notebook){
 	if(!notebook) return;
-	cells_drop(notebook->cells, notebook->length);
+	//cells_drop(notebook->cells, notebook->length); keys are managed by the doc
 	yyjson_mut_doc_free(notebook->src);
 	free(notebook);
 }

@@ -27,7 +27,7 @@
 //#include "ScintillaWidget.h"
 #include <yyjson.h>
 #include <stdbool.h>
-#include <geanyplugin.h>//Switch to "Scintilla.h"/"ScintillaWidget.h" and maybe add "gtk/gtk"
+#include <sciwrappers.h>//Switch to "Scintilla.h"/"ScintillaWidget.h" and maybe add "gtk/gtk"
 
 //typedef struct Code{
 //	yyjson_mut_val *src;
@@ -65,14 +65,15 @@ typedef struct Notebook{
   Cell *cells;
   size_t length;
   size_t capacity;
-	//char *list[8]; //Canonical list of Cells keys (used when "Run All is called")
+  const char **list; //Canonical list of Cells keys (used when "Run All is called")
 } Notebook;
 
 Notebook *notebook_create(ScintillaObject *sci, int flag);
 void cell_create(Notebook *notebook, BlockType type, const char *key, yyjson_mut_val *new_cell);
-void cells_drop(Cell *cell, size_t length);
+//void cells_drop(Cell *cell, size_t length); keys managed by the doc
 void notebook_drop(Notebook *notebook);
 bool notebook_contains(Notebook *notebook, const char *key);
 bool notebook_load_cells(Notebook *notebook);
+void notebook_set_text(Notebook *notebook, ScintillaObject *sci);
 
 #endif

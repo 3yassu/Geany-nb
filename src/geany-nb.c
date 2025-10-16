@@ -41,6 +41,7 @@ static void activate_notebook(GtkMenuItem *menuitem, gpointer user_data){
 	if(!notebook_load_cells(notebook)){
 		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Notbook not loaded fully...");
 	}
+	notebook_set_text(notebook, doc->editor->sci);
 	dialogs_show_msgbox(GTK_MESSAGE_INFO, "NOTEBOOK SUCCESS....");
 	notebook_drop(notebook);
 	return;
