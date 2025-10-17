@@ -56,6 +56,7 @@ typedef struct Cell{
 	const char *key;
 	Block entry;
 	BlockType type;
+	//int start, end; //start and end lines to keep track of different cells?
 }Cell;
 
 typedef struct Notebook{
