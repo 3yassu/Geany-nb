@@ -74,7 +74,7 @@ void geany_load_module(GeanyPlugin *plugin){
 
 	/*Metadata*/
 	plugin->info->name = "Geany Notebook";
-	plugin->info->description = "Extend geany support for python notebook";
+	plugin->info->description = "Python Notebook support";
 	plugin->info->version = "0.0.1";
 	plugin->info->author = "Eyassu Mongalo";
 
