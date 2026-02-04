@@ -1,16 +1,18 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -lyyjson -luuid
+CFLAGS = -Wall -Wextra -lyyjson
+GOFLAGS = -shared `pkg-config --libs geany`
+GCFLAGS = -fPIC `pkg-config --cflags geany`
 
 all: geany-nb
 
-geany-nb: geany-nb.o json-parser.o
-	$(CC) $(CFLAGS) -o ~/.config/geany/plugins/geany-nb.so geany-nb.o json-parser.o -shared `pkg-config --libs geany`
+geany-nb: geany-nb.o notebook.o
+	$(CC) $(CFLAGS) -o ~/.config/geany/plugins/geany-nb.so $^ $(GOFLAGS)
 
 geany-nb.o: geany-nb.c
-	$(CC) $(CFLAGS) -c geany-nb.c -fPIC `pkg-config --cflags geany`
+	$(CC) $(CFLAGS) -c geany-nb.c $(GCFLAGS)
 
-json-parser.o: json-parser.c
-	$(CC) $(CFLAGS) -c json-parser.c -fPIC `pkg-config --cflags geany`
+notebook.o: json/notebook.c
+	$(CC) $(CFLAGS) -c json/notebook.c $(GCFLAGS)
 
 clean:
 	rm -f geany-nb.so *.o
