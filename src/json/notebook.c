@@ -150,9 +150,9 @@ void notebook_set_text(Notebook *self, const char *buf, size_t len){
 	
 	char *ptr = (char *)malloc(len);
 	strcpy(ptr, buf);
-	for(char *i = ptr, *j = ptr; (i = strchr(++i, '\n'));){
-		yyjson_mut_arr_add_strncpy(self->src, arr, buf + (j - ptr), i - j);
-		j = i;
+	for(char *i = ptr, *j = ptr; (i = strchr(i+1, '\n'));){
+		yyjson_mut_arr_add_strncpy(self->src, arr, buf + (j - ptr), i - j + 1);
+		j = ++i;
 	}
 	free(ptr);
 }
