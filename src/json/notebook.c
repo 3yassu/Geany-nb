@@ -1,15 +1,31 @@
 #include <stdlib.h>
+#include <Python.h>
 #include "notebook.h"
 #include "cell.h"
 #define New(T) (T *)malloc(sizeof(T))
-void notebook_push(Notebook *self, Cell val);
+static void notebook_push(Notebook *self, Cell val);
+static void notebook_initialize_python(Notebook *self);
 
 struct Notebook {
 	size_t len, cap, cur_index;
 	Cell *ptr;
 	yyjson_mut_doc *src;
 	yyjson_mut_val *cells;
+	/* This one may be replaced with a static variable if more than 1 NB supported */
+	PyObject *io;
 };
+
+static void notebook_initialize_python(Notebook *self){
+	Py_Initialize();
+	PyObject *sys = PyImport_ImportModule("sys");
+	PyObject *io = PyImport_ImportModule("io");
+	self->io = PyObject_CallMethod(io, "StringIO", NULL);
+
+	PyObject_SetAttrString(sys, "stdout", self->io);
+	PyObject_SetAttrString(sys, "stderr", self->io);
+	Py_DECREF(io);
+	Py_DECREF(sys);
+}
 
 Notebook *notebook_new(){
 	Notebook *ptr = New(Notebook);
@@ -18,6 +34,7 @@ Notebook *notebook_new(){
 		return NULL;
 	}
 	*ptr = (Notebook){.len = 0, .cap = 0, .ptr = NULL, .src = NULL, .cells = NULL};
+	notebook_initialize_python(ptr);
 	return ptr;
 }
 
@@ -32,7 +49,7 @@ Notebook *notebook_from_doc(void *doc){
 		size_t idx, max;
 		yyjson_mut_val *elem;
 		yyjson_mut_arr_foreach(arr, idx, max, elem){
-			enum BlockType type = strcmp(yyjson_mut_get_str(yyjson_mut_obj_get(elem, "cell_type")), "code") ? CODE : MKDN;
+			enum BlockType type = strcmp(yyjson_mut_get_str(yyjson_mut_obj_get(elem, "cell_type")), "code") ? MKDN : CODE;
 			notebook_push(self, (Cell){.type = type, .src = elem});
 		}
 	}
@@ -40,9 +57,9 @@ Notebook *notebook_from_doc(void *doc){
 	return self;
 }
 
-const char *notebook_get_doc(Notebook *self){
+char *notebook_get_doc(Notebook *self){
 	if(self)
-		return (const char *)yyjson_mut_write(self->src, YYJSON_WRITE_PRETTY, NULL);
+		return (char *)yyjson_mut_write(self->src, YYJSON_WRITE_PRETTY, NULL);
 	return NULL;
 }
 
@@ -70,7 +87,7 @@ Notebook *notebook_from_str(char *buf, size_t len){
 		size_t idx, max;
 		yyjson_mut_val *elem;
 		yyjson_mut_arr_foreach(arr, idx, max, elem){
-			enum BlockType type = strcmp(yyjson_mut_get_str(yyjson_mut_obj_get(elem, "cell_type")), "code") ? CODE : MKDN;
+			enum BlockType type = strcmp(yyjson_mut_get_str(yyjson_mut_obj_get(elem, "cell_type")), "code") ? MKDN : CODE;
 			notebook_push(self, (Cell){.type = type, .src = elem});
 		}
 	}
@@ -109,7 +126,7 @@ void notebook_grow(Notebook *self){
 	self->cap = new_cap;
 }
 
-void notebook_push(Notebook *self, Cell val){
+static void notebook_push(Notebook *self, Cell val){
 	if(self){
 		if(self->len == self->cap)
 			notebook_grow(self);
@@ -125,21 +142,26 @@ void notebook_push_new(Notebook *self, enum BlockType type){
 	}
 }
 
-const char **notebook_get_text(Notebook *self, size_t index){
+char *notebook_get_text(Notebook *self, size_t index){
 	if(index >= self->len)
 		return NULL;
 	yyjson_mut_val *arr = yyjson_mut_obj_get(self->ptr[index].src, "source");
-	size_t size = yyjson_mut_arr_size(arr);
-	const char **bufs = (const char **)calloc(size + 1, sizeof(const char *));
-	if(!bufs)
-		return NULL;
-	size_t idx;
+
 	yyjson_mut_val *elem;
-	for(idx = 1, elem = yyjson_mut_arr_get_first(arr); idx <= size; idx++, elem = elem->next){
-		bufs[size-idx] = yyjson_mut_get_str(elem);
+	size_t idx, max, len = 0;
+	yyjson_mut_arr_foreach(arr, idx, max, elem)
+		len += yyjson_mut_get_len(elem);
+
+	char *cell_str = (char *)malloc(len + 1);
+	len = 0;
+	yyjson_mut_arr_foreach(arr, idx, max, elem){
+		strcpy(cell_str + len, yyjson_mut_get_str(elem));
+		len += yyjson_mut_get_len(elem);
 	}
+	cell_str[len] = '\0';
+
 	self->cur_index = index;
-	return bufs;
+	return cell_str;
 }
 
 void notebook_set_text(Notebook *self, const char *buf, size_t len){
@@ -148,7 +170,7 @@ void notebook_set_text(Notebook *self, const char *buf, size_t len){
 	yyjson_mut_val *arr = yyjson_mut_obj_get(self->ptr[self->cur_index].src, "source");
 	yyjson_mut_arr_clear(arr);
 	
-	char *ptr = (char *)malloc(len);
+	char *ptr = (char *)malloc(len + 1);
 	strcpy(ptr, buf);
 	for(char *i = ptr, *j = ptr; (i = strchr(i+1, '\n'));){
 		yyjson_mut_arr_add_strncpy(self->src, arr, buf + (j - ptr), i - j + 1);
@@ -157,13 +179,55 @@ void notebook_set_text(Notebook *self, const char *buf, size_t len){
 	free(ptr);
 }
 
-void notebook_run_cell(Notebook *self, size_t index){
+char *notebook_run_cell(Notebook *self, size_t index){
 	if(!self)
-		return;
+		return NULL;
 	if(index >= self->len){
 		fprintf(stderr, "Index Error");
-		return;
-	} 	
+		return NULL;
+	}
+	if(self->ptr[index].type == MKDN){
+		fprintf(stderr, "What the hell");
+		return NULL;
+	}
+	char *cell_str = notebook_get_text(self, index);
+	if(!cell_str)
+		return NULL;
+	PyRun_SimpleString(cell_str);
+	free(cell_str);
+	PyObject *output = PyObject_CallMethod(self->io, "getvalue", NULL);
+	const char *tmp_res = PyUnicode_AsUTF8(output);
+	char *res = (char *)malloc(strlen(tmp_res) + 1);
+	strcpy(res, tmp_res);
+	Py_DECREF(output);
+	PyObject_CallMethod(self->io, "seek", "i", 0);
+	PyObject_CallMethod(self->io, "truncate", "i", 0);
+	return res;
+
+}
+
+char *notebook_run_all(Notebook *self){
+	if(!self)
+		return NULL;
+	for(size_t i = 0; i < self->len; i++){
+		if(self->ptr[i].type == MKDN)
+			continue;
+		char *cell_str = notebook_get_text(self, i);
+		if(!cell_str)
+			return NULL;
+		int val = PyRun_SimpleString(cell_str);
+		free(cell_str);
+		if(val)
+			break;
+	}
+	PyObject *output = PyObject_CallMethod(self->io, "getvalue", NULL);
+	const char *tmp_res = PyUnicode_AsUTF8(output);
+	char *res = (char *)malloc(strlen(tmp_res) + 1);
+	strcpy(res, tmp_res);
+	Py_DECREF(output);
+	PyObject_CallMethod(self->io, "seek", "i", 0);
+	PyObject_CallMethod(self->io, "truncate", "i", 0);
+	return res;
 }
 
 void notebook_free(Notebook *self){
@@ -172,5 +236,6 @@ void notebook_free(Notebook *self){
 			free(self->ptr);
 		yyjson_mut_doc_free(self->src);
 		free(self);
+		Py_Finalize();
 	}
 }
