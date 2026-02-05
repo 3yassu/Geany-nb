@@ -190,6 +190,7 @@ char *notebook_run_cell(Notebook *self, size_t index){
 		fprintf(stderr, "What the hell");
 		return NULL;
 	}
+	/* Add function notebook_get_py_text(self, index) to run commands */
 	char *cell_str = notebook_get_text(self, index);
 	if(!cell_str)
 		return NULL;
@@ -203,7 +204,6 @@ char *notebook_run_cell(Notebook *self, size_t index){
 	PyObject_CallMethod(self->io, "seek", "i", 0);
 	PyObject_CallMethod(self->io, "truncate", "i", 0);
 	return res;
-
 }
 
 char *notebook_run_all(Notebook *self){
