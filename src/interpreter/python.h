@@ -1,5 +1,5 @@
 /*
- *  notebook.h
+ *  python.h
  *
  *  Copyright 2025 Eyassu Mongalo <3yassu@gmail.com>
  *
@@ -21,34 +21,16 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef NOTEBOOK_H
-#define NOTEBOOK_H
-#include <stddef.h>
-typedef struct Notebook Notebook;
+#ifndef IPYTHON_H
+#define IPYTHON_H
 
-enum BlockType {
-  CODE,
-  MKDN,
-};
+/* typedef struct Kernel Kernel; */
 
-Notebook *notebook_from_str(char *buf, size_t len);
-/* Cell Operations */
-char *notebook_get_text(Notebook *self, size_t index);
-void notebook_set_text(Notebook *self, const char *buf);
-size_t notebook_get_cur_ind(Notebook *self);
-char *notebook_run_cell(Notebook *self, size_t index);
-void notebook_push_new(Notebook *self, enum BlockType type);
-void notebook_remove_index(Notebook *self, size_t index, enum BlockType);
-int notebook_insert_index(Notebook *self, size_t index);
+int ipython_init();
+char *ipython_io();
+char *ipython_run_string(const char *str);
+int ipython_run_keep_io(const char *str);
+void ipython_end();
 
-/* Str getters */
-char *notebook_get_doc(Notebook *self);
-char *notebook_run_all(Notebook *self);
-
-/* Member variable getters */
-size_t notebook_len(Notebook *self);
-
-/* Deallocate */
-void notebook_free(Notebook *self);
 
 #endif

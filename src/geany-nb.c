@@ -21,8 +21,8 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <geanyplugin.h>
 #include "json/notebook.h"
+#include <geanyplugin.h>
 
 /* Function Definitions */
 static void activate_notebook(GtkMenuItem *menu_item, gpointer menu_data);
@@ -30,260 +30,253 @@ static void deactivate_notebook(GtkMenuItem *menu_item, gpointer menu_data);
 static void open_notebook_cell(GtkMenuItem *menu_item, gpointer user_data);
 static void run_notebook_cell(GtkMenuItem *menu_item, gpointer user_data);
 static gboolean create_gtk_spin(size_t *value, size_t max);
-static void before_save_notebook(GObject *obj, GeanyDocument *doc, gpointer user_data);
+static void before_save_notebook(GObject *obj, GeanyDocument *doc,
+                                 gpointer user_data);
 static void save_notebook(GObject *obj, GeanyDocument *doc, gpointer user_data);
 
 static Notebook *global_notebook = NULL;
-static GeanyDocument *nb_doc= NULL;
+static GeanyDocument *nb_doc = NULL;
 
-static gboolean create_gtk_spin(size_t *value, size_t max){
-	GtkWidget *window, *spin;
-	GtkAdjustment *adj;
-	
-	adj = gtk_adjustment_new(0, 0, max, 1, 10, 0);
-	spin = gtk_spin_button_new(adj, 1, 0);
-	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	
-	gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(spin), TRUE);
-	gtk_spin_button_set_snap_to_ticks(GTK_SPIN_BUTTON(spin), TRUE);
-	GtkWidget *dialog = gtk_dialog_new_with_buttons(
-		"Enter a number",
-		GTK_WINDOW(window),
-		GTK_DIALOG_MODAL,
-		"_OK", GTK_RESPONSE_OK,
-		"_Cancel", GTK_RESPONSE_CANCEL,
-		NULL
-	);
+static gboolean create_gtk_spin(size_t *value, size_t max) {
+  GtkWidget *window, *spin;
+  GtkAdjustment *adj;
 
-	GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-	gtk_container_add(GTK_CONTAINER(content), spin);
-	
-	gtk_widget_show_all(dialog);
-	if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK){
-		*value = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
-		gtk_widget_destroy(dialog);
-		return TRUE;
-	}else{
-		gtk_widget_destroy(dialog);
-		return FALSE;
-	}
+  adj = gtk_adjustment_new(0, 0, max, 1, 10, 0);
+  spin = gtk_spin_button_new(adj, 1, 0);
+  window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+  gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(spin), TRUE);
+  gtk_spin_button_set_snap_to_ticks(GTK_SPIN_BUTTON(spin), TRUE);
+  GtkWidget *dialog = gtk_dialog_new_with_buttons(
+      "Enter a number", GTK_WINDOW(window), GTK_DIALOG_MODAL, "_OK",
+      GTK_RESPONSE_OK, "_Cancel", GTK_RESPONSE_CANCEL, NULL);
+
+  GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  gtk_container_add(GTK_CONTAINER(content), spin);
+
+  gtk_widget_show_all(dialog);
+  if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
+    *value = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+    gtk_widget_destroy(dialog);
+    return TRUE;
+  } else {
+    gtk_widget_destroy(dialog);
+    return FALSE;
+  }
 }
 
-static void open_notebook_cell(GtkMenuItem *menu_item, gpointer user_data){
-	size_t cell_num = 0;
-	GeanyDocument *doc = document_get_current();
+static void open_notebook_cell(GtkMenuItem *menu_item, gpointer user_data) {
+  size_t cell_num = 0;
+  GeanyDocument *doc = document_get_current();
 
-	if(doc != nb_doc){
-		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Doc not obtained </3");
-		return;
-	}
+  if (doc != nb_doc) {
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, "Doc not obtained </3");
+    return;
+  }
 
-	ScintillaObject *sci = doc->editor->sci;
-	gboolean err = create_gtk_spin(&cell_num, notebook_len(global_notebook) - 1);
-	
-	if(!err)
-		return;
+  ScintillaObject *sci = doc->editor->sci;
+  gboolean err = create_gtk_spin(&cell_num, notebook_len(global_notebook) - 1);
 
-	char *cell_str= notebook_get_text(global_notebook, cell_num);
-	if(!cell_str){
-		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Failed to Obtain cell source");
-		return;
-	}
+  if (!err)
+    return;
 
-	sci_set_text(sci, cell_str);
-	free(cell_str);
+  char *cell_str = notebook_get_text(global_notebook, cell_num);
+  if (!cell_str) {
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, "Failed to Obtain cell source");
+    return;
+  }
+
+  sci_set_text(sci, cell_str);
+  free(cell_str);
 }
 
-static void run_notebook_cell(GtkMenuItem *menu_item, gpointer user_data){
-	size_t cell_num = 0;
-	gboolean err = create_gtk_spin(&cell_num, notebook_len(global_notebook) - 1);
+static void run_notebook_cell(GtkMenuItem *menu_item, gpointer user_data) {
+  size_t cell_num = 0;
+  gboolean err = create_gtk_spin(&cell_num, notebook_len(global_notebook) - 1);
 
-	if(!err)
-		return;
+  if (!err)
+    return;
 
-	char *output = notebook_run_cell(global_notebook, cell_num);
-	if(!output)
-		return;
-	msgwin_compiler_add_string(COLOR_BLUE, output);
-	free(output);
+  char *output = notebook_run_cell(global_notebook, cell_num);
+  if (!output)
+    return;
+  msgwin_compiler_add_string(COLOR_BLUE, output);
+  free(output);
 }
 
-static void run_notebook_cells(GtkMenuItem *menu_item, gpointer user_data){
-	char *output = notebook_run_all(global_notebook);
-	if(!output)
-		return;
-	msgwin_compiler_add_string(COLOR_BLUE, output);
-	free(output);
+static void run_notebook_cells(GtkMenuItem *menu_item, gpointer user_data) {
+  char *output = notebook_run_all(global_notebook);
+  if (!output)
+    return;
+  msgwin_compiler_add_string(COLOR_BLUE, output);
+  free(output);
 }
 
-static void deactivate_notebook(GtkMenuItem *menu_item, gpointer menu_data){
-	if(nb_doc){
-		ScintillaObject *sci = nb_doc->editor->sci;
-		notebook_set_text(global_notebook, sci_get_contents(sci, -1), sci_get_length(sci));
-		char *doc_str = notebook_get_doc(global_notebook);
-		sci_set_text(sci, doc_str);
-		free(doc_str);
-	}
+static void deactivate_notebook(GtkMenuItem *menu_item, gpointer menu_data) {
+  if (nb_doc) {
+    ScintillaObject *sci = nb_doc->editor->sci;
+    notebook_set_text(global_notebook, sci_get_contents(sci, -1));
+    char *doc_str = notebook_get_doc(global_notebook);
+    sci_set_text(sci, doc_str);
+    free(doc_str);
+  }
 
-	notebook_free(global_notebook);
-	global_notebook = NULL;
-	nb_doc = NULL;
-	
-	GtkWidget *nb_initialize;
-	GtkWidget *notebook_menu = (GtkWidget *) menu_data;
-	GList *children, *l;
+  notebook_free(global_notebook);
+  global_notebook = NULL;
+  nb_doc = NULL;
 
-	children = gtk_container_get_children(GTK_CONTAINER(notebook_menu));
+  GtkWidget *nb_initialize;
+  GtkWidget *notebook_menu = (GtkWidget *)menu_data;
+  GList *children, *l;
 
-	for (l = children; l != NULL; l = l->next)
-		gtk_widget_destroy(GTK_WIDGET(l->data));
+  children = gtk_container_get_children(GTK_CONTAINER(notebook_menu));
 
-	g_list_free(children);
+  for (l = children; l != NULL; l = l->next)
+    gtk_widget_destroy(GTK_WIDGET(l->data));
 
-	nb_initialize = gtk_menu_item_new_with_mnemonic("_Initialize Notebook");
-	gtk_widget_show(nb_initialize);
-	gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_initialize);
-	g_signal_connect(nb_initialize, "activate",
-	G_CALLBACK(activate_notebook), notebook_menu);
+  g_list_free(children);
+
+  nb_initialize = gtk_menu_item_new_with_mnemonic("_Initialize Notebook");
+  gtk_widget_show(nb_initialize);
+  gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_initialize);
+  g_signal_connect(nb_initialize, "activate", G_CALLBACK(activate_notebook),
+                   notebook_menu);
 }
 
-static void activate_notebook(GtkMenuItem *menu_item, gpointer menu_data){
-	GeanyDocument *doc = document_get_current();
+static void activate_notebook(GtkMenuItem *menu_item, gpointer menu_data) {
+  GeanyDocument *doc = document_get_current();
 
-	if(!doc){
-		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Doc not obtained </3");
-		return;
-	}
+  if (!doc) {
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, "Doc not obtained </3");
+    return;
+  }
 
-	GtkWidget *nb_deinitialize,  *nb_run_all;
-	GtkWidget *nb_open_cell, *nb_run_cell, *nb_cell_menu, *nb_cell_item;
-	GtkWidget *notebook_menu = (GtkWidget *) menu_data;
+  GtkWidget *nb_deinitialize, *nb_run_all;
+  GtkWidget *nb_open_cell, *nb_run_cell, *nb_cell_menu, *nb_cell_item;
+  GtkWidget *notebook_menu = (GtkWidget *)menu_data;
 
-	ScintillaObject *sci = doc->editor->sci;
-	Notebook *notebook = notebook_from_str(sci_get_contents(sci, -1), sci_get_length(sci));
+  ScintillaObject *sci = doc->editor->sci;
+  Notebook *notebook =
+      notebook_from_str(sci_get_contents(sci, -1), sci_get_length(sci));
 
-	if(!notebook){
-		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Notbook not made....");
-		return;
-	}
+  if (!notebook) {
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, "Notbook not made....");
+    return;
+  }
 
-	global_notebook = notebook;
-	gtk_widget_destroy(GTK_WIDGET(menu_item));
+  global_notebook = notebook;
+  gtk_widget_destroy(GTK_WIDGET(menu_item));
 
-	nb_cell_item = gtk_menu_item_new_with_mnemonic("_Cell");
-	gtk_widget_show(nb_cell_item);
-	nb_cell_menu = gtk_menu_new();
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM(nb_cell_item), nb_cell_menu);
+  nb_cell_item = gtk_menu_item_new_with_mnemonic("_Cell");
+  gtk_widget_show(nb_cell_item);
+  nb_cell_menu = gtk_menu_new();
+  gtk_menu_item_set_submenu(GTK_MENU_ITEM(nb_cell_item), nb_cell_menu);
 
-	nb_open_cell = gtk_menu_item_new_with_mnemonic("_Open Cell");
-	gtk_widget_show(nb_open_cell);
-	gtk_menu_shell_append(GTK_MENU_SHELL(nb_cell_menu), nb_open_cell);
-	g_signal_connect(nb_open_cell, "activate",
-	  G_CALLBACK(open_notebook_cell), NULL);
+  nb_open_cell = gtk_menu_item_new_with_mnemonic("_Open Cell");
+  gtk_widget_show(nb_open_cell);
+  gtk_menu_shell_append(GTK_MENU_SHELL(nb_cell_menu), nb_open_cell);
+  g_signal_connect(nb_open_cell, "activate", G_CALLBACK(open_notebook_cell),
+                   NULL);
 
-	nb_run_cell = gtk_menu_item_new_with_mnemonic("_Run Cell");
-	gtk_widget_show(nb_run_cell);
-	gtk_menu_shell_append(GTK_MENU_SHELL(nb_cell_menu), nb_run_cell);
-	g_signal_connect(nb_run_cell, "activate",
-	  G_CALLBACK(run_notebook_cell), NULL);
+  nb_run_cell = gtk_menu_item_new_with_mnemonic("_Run Cell");
+  gtk_widget_show(nb_run_cell);
+  gtk_menu_shell_append(GTK_MENU_SHELL(nb_cell_menu), nb_run_cell);
+  g_signal_connect(nb_run_cell, "activate", G_CALLBACK(run_notebook_cell),
+                   NULL);
 
-	gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_cell_item);
+  gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_cell_item);
 
-	nb_deinitialize = gtk_menu_item_new_with_mnemonic("_Deinitialize Notebook");
-	gtk_widget_show(nb_deinitialize);
-	gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_deinitialize);
-	g_signal_connect(nb_deinitialize, "activate",
-	  G_CALLBACK(deactivate_notebook), notebook_menu);
+  nb_deinitialize = gtk_menu_item_new_with_mnemonic("_Deinitialize Notebook");
+  gtk_widget_show(nb_deinitialize);
+  gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_deinitialize);
+  g_signal_connect(nb_deinitialize, "activate", G_CALLBACK(deactivate_notebook),
+                   notebook_menu);
 
-	nb_run_all = gtk_menu_item_new_with_mnemonic("_Run All Cells");
-	gtk_widget_show(nb_run_all);
-	gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_run_all);
-	g_signal_connect(nb_run_all, "activate",
-	  G_CALLBACK(run_notebook_cells), notebook_menu);
+  nb_run_all = gtk_menu_item_new_with_mnemonic("_Run All Cells");
+  gtk_widget_show(nb_run_all);
+  gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_run_all);
+  g_signal_connect(nb_run_all, "activate", G_CALLBACK(run_notebook_cells),
+                   notebook_menu);
 
+  nb_doc = doc;
+  char *cell_str = notebook_get_text(global_notebook, 0);
+  if (!cell_str) {
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, "Failed to Obtain cell source");
+    return;
+  }
 
-	nb_doc = doc;
-	char *cell_str = notebook_get_text(global_notebook, 0);
-	if(!cell_str){
-		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Failed to Obtain cell source");
-		return;
-	}
-
-	sci_set_text(sci, cell_str);
-	free(cell_str);
+  sci_set_text(sci, cell_str);
+  free(cell_str);
 }
 
-static void before_save_notebook(GObject *obj, GeanyDocument *doc, gpointer user_data){
-	if(doc != nb_doc)
-		return;
-	ScintillaObject *sci = doc->editor->sci;
-	notebook_set_text(global_notebook, sci_get_contents(sci, -1), sci_get_length(sci));
-	char *doc_str = notebook_get_doc(global_notebook);
-	sci_set_text(sci, doc_str);
-	free(doc_str);
+static void before_save_notebook(GObject *obj, GeanyDocument *doc,
+                                 gpointer user_data) {
+  if (doc != nb_doc)
+    return;
+  ScintillaObject *sci = doc->editor->sci;
+  notebook_set_text(global_notebook, sci_get_contents(sci, -1));
+  char *doc_str = notebook_get_doc(global_notebook);
+  sci_set_text(sci, doc_str);
+  free(doc_str);
 }
 
-static void save_notebook(GObject *obj, GeanyDocument *doc, gpointer user_data){
-	if(doc != nb_doc)
-		return;
-	ScintillaObject *sci = doc->editor->sci;
-	char *cell_str = notebook_get_text(global_notebook, notebook_get_cur_ind(global_notebook));
-	if(!cell_str){
-		dialogs_show_msgbox(GTK_MESSAGE_INFO, "Failed to Obtain cell source");
-		return;
-	}
-	sci_set_text(sci, cell_str);
-	free(cell_str);
+static void save_notebook(GObject *obj, GeanyDocument *doc,
+                          gpointer user_data) {
+  if (doc != nb_doc)
+    return;
+  ScintillaObject *sci = doc->editor->sci;
+  char *cell_str =
+      notebook_get_text(global_notebook, notebook_get_cur_ind(global_notebook));
+  if (!cell_str) {
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, "Failed to Obtain cell source");
+    return;
+  }
+  sci_set_text(sci, cell_str);
+  free(cell_str);
 }
 
+static gboolean notebook_init(GeanyPlugin *plugin, gpointer pdata) {
+  GtkWidget *notebook_menu_item;
+  GtkWidget *notebook_menu;
+  GtkWidget *nb_initialize;
 
-static gboolean notebook_init(GeanyPlugin *plugin, gpointer pdata){
-	GtkWidget *notebook_menu_item;
-	GtkWidget *notebook_menu;
-	GtkWidget *nb_initialize;
+  notebook_menu_item = gtk_menu_item_new_with_mnemonic("_Notebook");
+  gtk_widget_show(notebook_menu_item);
+  notebook_menu = gtk_menu_new();
+  gtk_menu_item_set_submenu(GTK_MENU_ITEM(notebook_menu_item), notebook_menu);
 
-	notebook_menu_item = gtk_menu_item_new_with_mnemonic("_Notebook");
-	gtk_widget_show(notebook_menu_item);
-	notebook_menu = gtk_menu_new();
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM(notebook_menu_item), notebook_menu);
+  nb_initialize = gtk_menu_item_new_with_mnemonic("_Initialize Notebook");
+  gtk_widget_show(nb_initialize);
+  gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_initialize);
+  g_signal_connect(nb_initialize, "activate", G_CALLBACK(activate_notebook),
+                   notebook_menu);
 
-	nb_initialize = gtk_menu_item_new_with_mnemonic("_Initialize Notebook");
-	gtk_widget_show(nb_initialize);
-	gtk_menu_shell_append(GTK_MENU_SHELL(notebook_menu), nb_initialize);
-	g_signal_connect(nb_initialize, "activate",
-		G_CALLBACK(activate_notebook), notebook_menu);
+  gtk_menu_shell_append(
+      GTK_MENU_SHELL(plugin->geany_data->main_widgets->tools_menu),
+      notebook_menu_item);
 
-	gtk_menu_shell_append(
-		GTK_MENU_SHELL(plugin->geany_data->main_widgets->tools_menu),
-		notebook_menu_item
-	);
-	
-	geany_plugin_set_data(plugin, notebook_menu_item, NULL);
-	plugin_signal_connect(plugin, NULL, 
-		"document-before-save", TRUE,
-		G_CALLBACK(before_save_notebook), NULL
-	);
+  geany_plugin_set_data(plugin, notebook_menu_item, NULL);
+  plugin_signal_connect(plugin, NULL, "document-before-save", TRUE,
+                        G_CALLBACK(before_save_notebook), NULL);
 
-	plugin_signal_connect(plugin,
-		NULL, "document-save", TRUE,
-		G_CALLBACK(save_notebook), NULL
-	);
-	return TRUE;
+  plugin_signal_connect(plugin, NULL, "document-save", TRUE,
+                        G_CALLBACK(save_notebook), NULL);
+  return TRUE;
 }
 
-static void notebook_cleanup(GeanyPlugin *plugin, gpointer pdata){
-	notebook_free(global_notebook); 
-	gtk_widget_destroy((GtkWidget *)pdata);
+static void notebook_cleanup(GeanyPlugin *plugin, gpointer pdata) {
+  notebook_free(global_notebook);
+  gtk_widget_destroy((GtkWidget *)pdata);
 }
 
-G_MODULE_EXPORT void geany_load_module(GeanyPlugin *plugin){
-	plugin->info->name = "Geany Notebook";
-	plugin->info->description = "Extend .ipynb support to Geany";
-	plugin->info->version = "0.0.1";
-	plugin->info->author = "Eyassu Mongalo";
+G_MODULE_EXPORT void geany_load_module(GeanyPlugin *plugin) {
+  plugin->info->name = "Geany Notebook";
+  plugin->info->description = "Extend .ipynb support to Geany";
+  plugin->info->version = "0.0.1";
+  plugin->info->author = "Eyassu Mongalo";
 
-	plugin->funcs->init= notebook_init;
-	plugin->funcs->cleanup = notebook_cleanup;
+  plugin->funcs->init = notebook_init;
+  plugin->funcs->cleanup = notebook_cleanup;
 
-	GEANY_PLUGIN_REGISTER(plugin, 225);
+  GEANY_PLUGIN_REGISTER(plugin, 225);
 }
